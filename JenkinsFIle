@@ -1,0 +1,80 @@
+pipeline{
+      environment {
+        registry = "sara1411/my_repository"
+        registryCredential = 'dockerhub'
+        dockerImage = ''
+        }
+
+   agent any
+        stages{
+            stage('Cloning Git'){
+                agent none
+                steps{
+                    checkout([$class: 'GitSCM', branches: [[name: '*/master']], userRemoteConfigs: [[credentialsId: 'Edu_sample_proj', url: 'https://github.com/sara1411/edurekaProject.git']]])
+                }
+            }
+            stage('Build Docker Image'){
+                agent none
+                steps{
+                   script {
+                      dockerImage = docker.build registry + ":$BUILD_NUMBER"
+                    }
+             
+                }
+            }
+            stage('Deploying Image') {
+                agent none
+                steps{
+                script {
+                  docker.withRegistry( '', registryCredential ) {
+                    dockerImage.push()
+                  }
+                }
+              }
+            }
+            stage('Stop and Remove the old Container if running'){
+                agent{
+                    node{
+                        label 'node-1'
+                    }
+                }
+                steps{
+                    sh 'sudo docker stop mycont'
+                    sh 'sudo docker rm mycont'
+                }
+            }
+            stage('Running Container'){
+                agent{
+                    node{
+                        label 'node-1'
+                    }
+                }
+                steps{
+                    sh 'sudo docker run --name mycont -d -p 8140:80 sara1411/my_repository:$BUILD_NUMBER'
+                }
+            }
+               stage('Run Selenium Test'){
+                agent{
+                    node{
+                        label 'windows-slave'
+                    }
+                }
+                 environment {
+                
+                 PATH = "C:\\WINDOWS\\SYSTEM32;C:\\Program Files\\Java\\jdk-14.0.1\\bin"
+
+                }
+                steps{
+                     bat 'java -jar myjar.jar'
+                     
+                    
+                }
+            }
+           
+           
+        
+          
+            
+        } 
+           
+}
